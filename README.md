@@ -94,10 +94,10 @@ The server will be accessible at `http://127.0.0.1:8000`.
 
 ## Screenshots
 
-### Server in Action
+### user1
 ![Server Image 1](https://github.com/user-attachments/assets/e75baddf-a7da-4c59-adad-00ed0b337b37)
 
-### Real-Time User Management
+### user2
 ![Server Image 2](https://github.com/user-attachments/assets/de0af26e-dd29-45c4-b3e5-34e9257089ae)
 
 ---
