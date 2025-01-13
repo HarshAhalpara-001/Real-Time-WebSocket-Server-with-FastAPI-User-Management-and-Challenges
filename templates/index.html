@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic Tac Toe WebSocket Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        header {
+            background-color: #0078D7;
+            color: white;
+            padding: 10px;
+            width: 100%;
+            text-align: center;
+        }
+        main {
+            margin-top: 20px;
+            width: 100%;
+            max-width: 600px;
+        }
+        .active-users {
+            margin-top: 20px;
+        }
+        button {
+            cursor: pointer;
+            padding: 5px 10px;
+            margin: 5px;
+            background-color: #0078D7;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #0056A4;
+        }
+        .user-list {
+            list-style: none;
+            padding: 0;
+        }
+        .user-list li {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        .notification {
+            color: green;
+            margin-top: 10px;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Tic Tac Toe</h1>
+    </header>
+    <main>
+        <div>
+            <label for="username">Enter your username:</label>
+            <input type="text" id="username" placeholder="Username">
+            <button onclick="joinGame()">Join Game</button>
+            <button onclick="leaveGame()">Leave Game</button>
+        </div>
+        <div class="active-users">
+            <h3>Active Players:</h3>
+            <ul class="user-list" id="user-list"></ul>
+        </div>
+        <div id="notification" class="notification"></div>
+        <div id="error" class="error"></div>
+    </main>
+
+    <script>
+        let socket;
+        const usernameInput = document.getElementById("username");
+        const userList = document.getElementById("user-list");
+        const notification = document.getElementById("notification");
+        const error = document.getElementById("error");
+
+        function joinGame() {
+            const username = usernameInput.value.trim();
+            if (!username) {
+                alert("Please enter a username!");
+                return;
+            }
+
+            // Connect WebSocket
+            socket = new WebSocket(`ws://127.0.0.1:8000/ws`);
+
+            socket.onopen = () => {
+                console.log("WebSocket connection established");
+                socket.send(JSON.stringify({ type: "join", username }));
+            };
+
+            socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                console.log("Received data:", data);
+
+                if (data.type === "active_users") {
+                    updateActiveUsers(data.users);
+                } else if (data.type === "connection_request") {
+                    showNotification(`Connection request from ${data.from_user}`, true);
+                    showConnectionButtons(data.from_user);
+                } else if (data.type === "connection_success") {
+                    showNotification(`You are now connected with ${data.with_user}`, true);
+                } else if (data.type === "connection_rejected") {
+                    showNotification(`${data.by_user} rejected your connection request`, false);
+                } else if (data.type === "error") {
+                    showError(data.message);
+                }
+            };
+
+            socket.onerror = (error) => {
+                console.error("WebSocket error:", error);
+                showError("WebSocket error occurred.");
+            };
+
+            socket.onclose = () => {
+                console.log("WebSocket connection closed");
+                clearActiveUsers();
+            };
+        }
+
+        function leaveGame() {
+            if (socket) {
+                socket.send(JSON.stringify({ type: "leave" }));
+                socket.close();
+                clearActiveUsers();
+                showNotification("You have left the game.", true);
+            }
+        }
+
+        function updateActiveUsers(users) {
+            userList.innerHTML = "";
+            users.forEach((user) => {
+                const li = document.createElement("li");
+                li.innerText = user;
+                const button = document.createElement("button");
+                button.innerText = "Challenge";
+                button.onclick = () => sendConnectionRequest(user);
+                li.appendChild(button);
+                userList.appendChild(li);
+            });
+        }
+
+        function clearActiveUsers() {
+            userList.innerHTML = "";
+        }
+
+        function sendConnectionRequest(targetUser) {
+            socket.send(JSON.stringify({ type: "connect_request", target_user: targetUser }));
+            showNotification(`Connection request sent to ${targetUser}`, true);
+        }
+
+        function acceptConnection(fromUser) {
+            socket.send(JSON.stringify({ type: "accept_request", from_user: fromUser }));
+            clearConnectionButtons();
+        }
+
+        function rejectConnection(fromUser) {
+            socket.send(JSON.stringify({ type: "reject_request", from_user: fromUser }));
+            clearConnectionButtons();
+        }
+
+        function showConnectionButtons(fromUser) {
+            const buttonsDiv = document.createElement("div");
+            buttonsDiv.id = "connection-buttons";
+            buttonsDiv.innerHTML = `
+                <button onclick="acceptConnection('${fromUser}')">Accept</button>
+                <button onclick="rejectConnection('${fromUser}')">Reject</button>
+            `;
+            document.body.appendChild(buttonsDiv);
+        }
+
+        function clearConnectionButtons() {
+            const buttonsDiv = document.getElementById("connection-buttons");
+            if (buttonsDiv) buttonsDiv.remove();
+        }
+
+        function showNotification(message, success = true) {
+            notification.innerText = message;
+            notification.style.color = success ? "green" : "red";
+            setTimeout(() => notification.innerText = "", 5000);
+        }
+
+        function showError(message) {
+            error.innerText = message;
+            setTimeout(() => error.innerText = "", 5000);
+        }
+    </script>
+</body>
+</html>
